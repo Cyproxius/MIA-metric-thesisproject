@@ -1,4 +1,5 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, GPTNeoXConfig, GPTNeoXForCausalLM
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 from pathlib import Path
 import torch
 import os 
@@ -13,7 +14,16 @@ def load_base_model(model_dir_prefix, name):
     print(f"Downloading model {name}")
     download_model(model_dir, name)
 
-  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True, device_map=device)
+  # Code to load models using accelerate, gives error
+  # config = GPTNeoXConfig.from_pretrained(name)
+  # with init_empty_weights():
+  #   model = GPTNeoXForCausalLM(config)
+  # model = load_checkpoint_and_dispatch(
+  #   model, checkpoint=model_dir
+  # )
+  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True, device_map='auto')
+  # Halving the models precision, diminishes results
+  # model = model.half()
   model.eval()
   tokenizer = AutoTokenizer.from_pretrained(name)
 
@@ -24,7 +34,7 @@ def download_model(model_dir, name):
   Path(model_dir).mkdir(parents=True, exist_ok=True)
   model = AutoModelForCausalLM.from_pretrained(name, return_dict=True, device_map='auto')
   model.save_pretrained(model_dir)
-
+  del model
   print(f"Model {name} downloaded and saved to {model_dir}")
 
 def generate_text(llm_model, tokenizer, input_text, num_words=20, temperature=1.0):
