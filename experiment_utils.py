@@ -2,6 +2,7 @@ from model_utils import *
 from data_utils import *
 from unlearning import *
 from collections import defaultdict
+from accelerate import Accelerator
 from eval import *
 import numpy as np
 from pickle import dump
@@ -19,7 +20,8 @@ class Experiment:
     self.unlearning_args = unlearning_args
 
   def experiment_loop(self, base_model, tokenizer, dataloader):
-
+    
+    accelerator = Accelerator()
     all_MIM_scores = []
     all_labels = []
 
@@ -32,6 +34,8 @@ class Experiment:
     UL_min_K_plusplus_vals = []
     ref_min_K_plusplus_vals = []
 
+    dataloader = accelerator.prepare(dataloader)
+
     for i, (batch_inputs, batch_labels) in tqdm(enumerate(dataloader)):
       all_labels += batch_labels
 
@@ -42,10 +46,12 @@ class Experiment:
       torch.cuda.empty_cache()
       # print("Memory after clearing cache")
       # print_torch_memory()
+      optimizer = torch.optim.Adam(unlearned_model.parameters(), lr=self.unlearning_args.lr)
+      unlearned_model, optimizer = accelerator.prepare(unlearned_model, optimizer)
 
       # Unlearn data and calculate PPL values
       for i in range(self.unlearning_args.steps):
-        unlearned_model = unlearn_dataslice(unlearned_model, tokenizer, batch_inputs, self.unlearning_args)
+        unlearned_model = unlearn_dataslice(unlearned_model, optimizer, batch_inputs, self.unlearning_args, accelerator)
 
       # print("Post unlearning:")
       # print("Memory before clearing cache")

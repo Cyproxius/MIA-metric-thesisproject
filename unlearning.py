@@ -25,17 +25,19 @@ def learn_dataslice(model, tokenizer, sentences, args):
     torch.cuda.empty_cache()
     return model
 
-def unlearn_dataslice(model, tokenizer, sentences, args):
+def unlearn_dataslice(model, optimizer, sentences, args, accelerator):
     learning_rate = args.lr
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #model = model.to(device)
     # criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     model.train()
+    #optimizer = accelerator.prepare(optimizer)
 
     optimizer.zero_grad()
     # print_torch_memory()
-    input_data = sentences.clone().detach().to(device)  # Adding batch dimension
+    input_data = sentences.clone().detach()
+    #.to(device)  # Adding batch dimension
     
     # print("Memory usage before forward pass")
     # print_torch_memory()
@@ -48,7 +50,8 @@ def unlearn_dataslice(model, tokenizer, sentences, args):
 
     # Add a minus do to gradient ascent instead of descent
     loss = -output[0]
-    loss.mean().backward()
+    accelerator.backward(loss.mean())
+    #loss.mean().backward()
     torch.cuda.empty_cache()
     # print("Memory usage before calling optimizer.step()")
     # print_torch_memory()

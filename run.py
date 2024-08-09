@@ -17,7 +17,7 @@ def get_experiment_args(args):
     split_name = args.split_name
     threshold = args.threshold
 
-    output_dir = f"experiment_output/{model}"
+    output_dir = f"/gpfs/home3/mkoopmans/experiment_output/{model}"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument('--model', '-m', type=str, required=True, help='Model name as presented on HuggingFace. Example: EleutherAI/pythia-2.8b')
     parser.add_argument('--dataset', '-d', type=str, required=True, help='Dataset to perform MIA on, as presented on HuggingFace. Example: swj0419/WikiMIA')
     parser.add_argument('--split_name', '-s', type=str, required=True, help='Split name, as presented on HuggingFace. For these experiments this is the length split. Example: WikiMIA_length128')
-    parser.add_argument('--model_dir', '-md', type=str, default="/dbfs/mnt/ds-data-apps/maris/base_models_dupe/", help='Directory to save the downloaded models to. Defaut:/dbfs/mnt/ds-data-apps/maris/base_models_dupe/')
+    parser.add_argument('--model_dir', '-md', type=str, default="/gpfs/home3/mkoopmans/base_models_dupe/", help='Directory to save the downloaded models to.')
     parser.add_argument('--threshold', '-t', type=int, default=160, help='Threshold value for cutting off tokenizer (default: 160)')
 
     # Unlearning arguments
