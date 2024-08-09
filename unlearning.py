@@ -38,12 +38,6 @@ def unlearn_dataslice(model, optimizer, sentences, args, accelerator):
     # print_torch_memory()
     input_data = sentences.clone().detach()
     #.to(device)  # Adding batch dimension
-    
-    # print("Memory usage before forward pass")
-    # print_torch_memory()
-    # torch.cuda.empty_cache()
-    # print("Memory usage after forward pass")
-    # print_torch_memory()
 
     output = model(input_data)
     # output = checkpoint(model, input_data)
@@ -53,11 +47,7 @@ def unlearn_dataslice(model, optimizer, sentences, args, accelerator):
     accelerator.backward(loss.mean())
     #loss.mean().backward()
     torch.cuda.empty_cache()
-    # print("Memory usage before calling optimizer.step()")
-    # print_torch_memory()
     optimizer.step()
-    # print("Memory usage after calling optimizer.step()")
-    # print_torch_memory()
 
     del optimizer
     torch.cuda.empty_cache()
