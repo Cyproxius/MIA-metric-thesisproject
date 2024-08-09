@@ -40,12 +40,8 @@ class Experiment:
       all_labels += batch_labels
 
       unlearned_model = copy.deepcopy(base_model)
-      # print("Unlearned model copying:")
-      # print("Memory before clearing cache")
-      # print_torch_memory()
       torch.cuda.empty_cache()
-      # print("Memory after clearing cache")
-      # print_torch_memory()
+      
       optimizer = torch.optim.Adam(unlearned_model.parameters(), lr=self.unlearning_args.lr)
       unlearned_model, optimizer = accelerator.prepare(unlearned_model, optimizer)
 
@@ -53,13 +49,8 @@ class Experiment:
       for i in range(self.unlearning_args.steps):
         unlearned_model = unlearn_dataslice(unlearned_model, optimizer, batch_inputs, self.unlearning_args, accelerator)
 
-      # print("Post unlearning:")
-      # print("Memory before clearing cache")
-      # print_torch_memory()
       torch.cuda.empty_cache()
-      # print("Memory after clearing cache")
-      # print_torch_memory()
-      
+
       UL_PPL_vals += calculate_PPL_values(unlearned_model, tokenizer, batch_inputs)
       UL_min_K_vals += calculate_min_K_scores(unlearned_model, tokenizer, batch_inputs)
       UL_min_K_plusplus_vals += calculate_min_K_plusplus_scores(unlearned_model, tokenizer, batch_inputs)
