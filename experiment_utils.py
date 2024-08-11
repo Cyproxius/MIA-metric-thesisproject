@@ -19,9 +19,12 @@ class Experiment:
     self.experiment_args = experiment_args
     self.unlearning_args = unlearning_args
 
-  def experiment_loop(self, base_model, tokenizer, dataloader):
+  def experiment_loop(self, dataloader):
     
     accelerator = Accelerator()
+    print(f"Accelerate device: {accelerator.device}")
+    print(f"Accelerate distributed type: {accelerator.distributed_type}")
+    print(f"Accelerate use distributed: {accelerator.use_distributed}")
     all_MIM_scores = []
     all_labels = []
 
@@ -34,16 +37,14 @@ class Experiment:
     UL_min_K_plusplus_vals = []
     ref_min_K_plusplus_vals = []
 
-    dataloader = accelerator.prepare(dataloader)
-
     for i, (batch_inputs, batch_labels) in tqdm(enumerate(dataloader)):
       all_labels += batch_labels
 
-      unlearned_model = copy.deepcopy(base_model)
+      unlearned_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
       torch.cuda.empty_cache()
-      
+
       optimizer = torch.optim.Adam(unlearned_model.parameters(), lr=self.unlearning_args.lr)
-      unlearned_model, optimizer = accelerator.prepare(unlearned_model, optimizer)
+      unlearned_model, optimizer, batch_inputs = accelerator.prepare(unlearned_model, optimizer, batch_inputs)
 
       # Unlearn data and calculate PPL values
       for i in range(self.unlearning_args.steps):
@@ -72,9 +73,12 @@ class Experiment:
         torch.cuda.empty_cache()
 
       else:
+        base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
         ref_PPL_vals += calculate_PPL_values(base_model, tokenizer, batch_inputs)
         ref_min_K_vals += calculate_min_K_scores(base_model, tokenizer, batch_inputs)
         ref_min_K_plusplus_vals += calculate_min_K_plusplus_scores(base_model, tokenizer, batch_inputs)
+        del base_model
+        torch.cuda.empty_cache()
 
     if self.unlearning_args.metric == 'PPL':
       all_MIM_scores = calculate_MIM_scores(ref_PPL_vals, UL_PPL_vals)
@@ -121,10 +125,11 @@ class Experiment:
 
     split = self.experiment_args.split
 
-    base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
+    #base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
+    tokenizer = AutoTokenizer.from_pretrained(self.experiment_args.model)
     dataloader = load_unlearn_dataset(self.experiment_args, tokenizer, self.unlearning_args.batch_size, split=split)
 
-    results_dict = self.experiment_loop(base_model, tokenizer, dataloader)
+    results_dict = self.experiment_loop(dataloader)
 
     self.save_experiment_data([results_dict], "single")
 

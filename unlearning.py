@@ -2,6 +2,8 @@ from data_utils import *
 from torch.utils.checkpoint import checkpoint
 import torch
 
+print(f"DEVICE COUNT: {torch.cuda.device_count()}")
+
 def learn_dataslice(model, tokenizer, sentences, args):
     learning_rate = args.lr
  
@@ -48,7 +50,6 @@ def unlearn_dataslice(model, optimizer, sentences, args, accelerator):
     #loss.mean().backward()
     torch.cuda.empty_cache()
     optimizer.step()
-
     del optimizer
     torch.cuda.empty_cache()
     return model
