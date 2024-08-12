@@ -45,14 +45,19 @@ class Experiment:
 
       optimizer = torch.optim.Adam(unlearned_model.parameters(), lr=self.unlearning_args.lr)
       unlearned_model, optimizer, batch_inputs = accelerator.prepare(unlearned_model, optimizer, batch_inputs)
-
+      print(f'model device after accelerate: {unlearned_model.device}')
+      print(f'batch_inputs.device after accelerate: {batch_inputs.device}')
       # Unlearn data and calculate PPL values
       for i in range(self.unlearning_args.steps):
         unlearned_model = unlearn_dataslice(unlearned_model, optimizer, batch_inputs, self.unlearning_args, accelerator)
+        print(f'model device after {i}th unlearning step: {unlearned_model.device}')
 
+      print(f'batch_inputs device bcc: {batch_inputs.device}')
+      print(f'model device bcc: {unlearned_model.device}')
       torch.cuda.empty_cache()
-
-      UL_PPL_vals += calculate_PPL_values(unlearned_model, tokenizer, batch_inputs)
+      print(f'model device acc: {unlearned_model.device}')
+      print(f'batch_inputs device acc: {batch_inputs.device}')
+      UL_PPL_vals += calculate_PPL_values(unlearned_model, tokenizer, batch_inputs, accelerator)
       UL_min_K_vals += calculate_min_K_scores(unlearned_model, tokenizer, batch_inputs)
       UL_min_K_plusplus_vals += calculate_min_K_plusplus_scores(unlearned_model, tokenizer, batch_inputs)
 

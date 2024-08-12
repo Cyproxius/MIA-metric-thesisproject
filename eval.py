@@ -17,16 +17,27 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 
-def calculatePerplexity(sentence, model, tokenizer, gpu):
+def calculatePerplexity(sentence, model, tokenizer, accelerator):
     """
     exp(loss)
     """
-    input_ids = torch.tensor(sentence).unsqueeze(0).to(gpu)
-    # print(f"Input ids shape: {input_ids.size()}")
+    input_ids = torch.tensor(sentence).unsqueeze(0)
+    print(f"Input id device: {input_ids.device}")
+# print(f"Input ids shape: {input_ids.size()}")
+    model.eval()
     with torch.no_grad():
+        print(f'Model device torch no_grad: {model.device}')
+        print(f'Input_ids device torch.no_grad {input_ids.device}')
         outputs = model(input_ids, labels=input_ids)
+        print(f'Model device after inference: {model.device}')
+    outputs = accelerator.gather_for_metrics(outputs)
+    print(outputs)
     loss, logits = outputs[:2]
-    
+    print(f"Loss device: {loss.device}")
+    print(f'Model device: {model.device}')
+    print(f'Logits device: {logits.device}')
+    loss, logits = accelerator.prepare(loss, logits)
+    print(f'Loss and logits after accelerate: {loss.device}, {logits.device}')
     # print(f"Loss shape: {loss.size()}")
     # print(f"Loss: {loss}")
     # print(f"Logits dimension: {np.array(logits).shape()}")
@@ -42,15 +53,19 @@ def calculatePerplexity(sentence, model, tokenizer, gpu):
     # probabilities = torch.nn.functional.log_softmax(logits[0][0], dim=-1)
 
     probabilities = torch.nn.functional.softmax(logits, dim=-1)
+    print(f'Probabilities device: {probabilities.device}')
     all_prob = []
     input_ids_processed = input_ids[0][1:]
+    print(f'input_ids_processed device: {input_ids_processed.device}')
     for i, token_id in enumerate(input_ids_processed):
         probability = probabilities[0, i, token_id].item()
         all_prob.append(probability)
 
     # stuff for Min-K%++ calculation 
     probs = torch.nn.functional.softmax(logits[0, :-1], dim=-1)
+    print(f'Probs device: {probs.device}')
     log_probs = torch.nn.functional.log_softmax(logits[0, :-1], dim=-1)
+    print(f'log_probs device: {log_probs.device}')
     token_log_probs = log_probs.gather(dim=-1, index=input_ids_processed.unsqueeze(-1)).squeeze(-1)
     mu = (probs * log_probs).sum(-1)
     sigma = (probs * torch.square(log_probs)).sum(-1) - torch.square(mu)
@@ -82,10 +97,13 @@ def calculate_min_K_scores(model, tokenizer, text_batch):
 
     return min_K_values
 
-def calculate_PPL_values(model, tokenizer, text_batch):
+def calculate_PPL_values(model, tokenizer, text_batch, accelerator):
     PPL_values = []
+    print(f'Model device (calculate_PPL_values): {model.device}')
+    print(f'Text batch device: {text_batch.device}')
     for text in text_batch:
-        PPL = calculatePerplexity(text, model, tokenizer, gpu=model.device)[0]
+        print(f'Text device: {text.device}')
+        PPL = calculatePerplexity(text, model, tokenizer, accelerator)[0]
         PPL_values.append(PPL)
     return PPL_values
 

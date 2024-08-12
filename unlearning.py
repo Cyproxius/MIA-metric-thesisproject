@@ -43,9 +43,9 @@ def unlearn_dataslice(model, optimizer, sentences, args, accelerator):
 
     output = model(input_data)
     # output = checkpoint(model, input_data)
-
+    #print(output)
     # Add a minus do to gradient ascent instead of descent
-    loss = -output[0]
+    loss = -output[0]['logits']
     accelerator.backward(loss.mean())
     #loss.mean().backward()
     torch.cuda.empty_cache()

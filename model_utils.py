@@ -7,7 +7,7 @@ import os
 # Helper functions to load models
 def load_base_model(model_dir_prefix, name):
   
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model_dir = model_dir_prefix + name
 
   if not os.path.exists(model_dir):
@@ -21,7 +21,7 @@ def load_base_model(model_dir_prefix, name):
   # model = load_checkpoint_and_dispatch(
   #   model, checkpoint=model_dir
   # )
-  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True, device_map='auto')
+  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True)
   # Halving the models precision, diminishes results
   # model = model.half()
   model.eval()
