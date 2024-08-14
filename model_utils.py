@@ -21,7 +21,7 @@ def load_base_model(model_dir_prefix, name):
   # model = load_checkpoint_and_dispatch(
   #   model, checkpoint=model_dir
   # )
-  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True)
+  model = AutoModelForCausalLM.from_pretrained(model_dir, return_dict=True, )
   # Halving the models precision, diminishes results
   # model = model.half()
   model.eval()

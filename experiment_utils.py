@@ -11,6 +11,7 @@ import math
 import copy
 import os
 import re
+import gc
 
 class Experiment:
 
@@ -22,9 +23,9 @@ class Experiment:
   def experiment_loop(self, dataloader):
     
     accelerator = Accelerator()
-    print(f"Accelerate device: {accelerator.device}")
-    print(f"Accelerate distributed type: {accelerator.distributed_type}")
-    print(f"Accelerate use distributed: {accelerator.use_distributed}")
+    #print(f"Accelerate device: {accelerator.device}")
+    #print(f"Accelerate distributed type: {accelerator.distributed_type}")
+    #print(f"Accelerate use distributed: {accelerator.use_distributed}")
     all_MIM_scores = []
     all_labels = []
 
@@ -38,6 +39,7 @@ class Experiment:
     ref_min_K_plusplus_vals = []
 
     for i, (batch_inputs, batch_labels) in tqdm(enumerate(dataloader)):
+      print(f'Iterating over {i}th batch')
       all_labels += batch_labels
 
       unlearned_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
@@ -45,25 +47,23 @@ class Experiment:
 
       optimizer = torch.optim.Adam(unlearned_model.parameters(), lr=self.unlearning_args.lr)
       unlearned_model, optimizer, batch_inputs = accelerator.prepare(unlearned_model, optimizer, batch_inputs)
-      print(f'model device after accelerate: {unlearned_model.device}')
-      print(f'batch_inputs.device after accelerate: {batch_inputs.device}')
+
       # Unlearn data and calculate PPL values
       for i in range(self.unlearning_args.steps):
         unlearned_model = unlearn_dataslice(unlearned_model, optimizer, batch_inputs, self.unlearning_args, accelerator)
-        print(f'model device after {i}th unlearning step: {unlearned_model.device}')
 
-      print(f'batch_inputs device bcc: {batch_inputs.device}')
-      print(f'model device bcc: {unlearned_model.device}')
       torch.cuda.empty_cache()
-      print(f'model device acc: {unlearned_model.device}')
-      print(f'batch_inputs device acc: {batch_inputs.device}')
-      UL_PPL_vals += calculate_PPL_values(unlearned_model, tokenizer, batch_inputs, accelerator)
+
+      UL_PPL_vals += calculate_PPL_values(unlearned_model, tokenizer, batch_inputs)
       UL_min_K_vals += calculate_min_K_scores(unlearned_model, tokenizer, batch_inputs)
       UL_min_K_plusplus_vals += calculate_min_K_plusplus_scores(unlearned_model, tokenizer, batch_inputs)
+
 
       # Delete unlearned model to reduce memory usage
       del unlearned_model
       torch.cuda.empty_cache()
+      accelerator.free_memory()
+      gc.collect()
 
       if self.unlearning_args.include_learning:
         learned_model = copy.deepcopy(base_model)
@@ -79,11 +79,17 @@ class Experiment:
 
       else:
         base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
+
+        base_model, batch_inputs = accelerator.prepare(base_model, batch_inputs)
+
         ref_PPL_vals += calculate_PPL_values(base_model, tokenizer, batch_inputs)
         ref_min_K_vals += calculate_min_K_scores(base_model, tokenizer, batch_inputs)
         ref_min_K_plusplus_vals += calculate_min_K_plusplus_scores(base_model, tokenizer, batch_inputs)
+
         del base_model
         torch.cuda.empty_cache()
+        accelerator.free_memory()
+        gc.collect()
 
     if self.unlearning_args.metric == 'PPL':
       all_MIM_scores = calculate_MIM_scores(ref_PPL_vals, UL_PPL_vals)
@@ -93,9 +99,8 @@ class Experiment:
       all_MIM_scores = calculate_MIM_scores(ref_min_K_plusplus_vals, UL_min_K_plusplus_vals)
     elif self.unlearning_args.metric == 'All':
       all_MIM_scores = calculate_MIM_scores_combined(ref_PPL_vals, UL_PPL_vals, ref_min_K_vals, UL_min_K_vals, ref_min_K_plusplus_vals, UL_min_K_plusplus_vals)
-    
-    # Delete models from memory to reduce memory usage
-    del base_model
+
+    # Reduce memory usage
     torch.cuda.empty_cache()
 
     # Check if any MIM scores are inf, then the model has been lobotomized. In that case, save the results as NaN
@@ -105,7 +110,7 @@ class Experiment:
       results_dict = self.get_results_dict(all_MIM_scores, all_labels)
 
     return results_dict
-  
+
   def get_results_dict_nan(self, MIM_scores):
     print(f"Encountered inf values in MIM calculation")
     results_dict = {metric: float('nan') for metric in MIM_scores[0].keys()}
@@ -113,16 +118,16 @@ class Experiment:
       "lr": copy.deepcopy(self.unlearning_args.lr),
       "steps": copy.deepcopy(self.unlearning_args.steps),
       "batch_size": copy.deepcopy(self.unlearning_args.batch_size)
-    } 
+    }
     return results_dict
-  
+
   def get_results_dict(self, MIM_scores, all_labels):
     results_dict = {metric: sweep(np.array([i[metric] for i in MIM_scores]), np.array(all_labels)) for metric in MIM_scores[0].keys()}
     results_dict["params"] = {
       "lr": copy.deepcopy(self.unlearning_args.lr),
       "steps": copy.deepcopy(self.unlearning_args.steps),
       "batch_size": copy.deepcopy(self.unlearning_args.batch_size)
-    } 
+    }
     return results_dict
 
   def run_experiment(self, unlearning_args):
@@ -135,14 +140,15 @@ class Experiment:
     dataloader = load_unlearn_dataset(self.experiment_args, tokenizer, self.unlearning_args.batch_size, split=split)
 
     results_dict = self.experiment_loop(dataloader)
-
+    print(f'Results: {results_dict}')
     self.save_experiment_data([results_dict], "single")
 
   def run_gridsearch(self, lrs, steps, batches):
     results_list = []
     n = self.unlearning_args.num_repeats
 
-    base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
+    #base_model, tokenizer = load_base_model(self.experiment_args.model_dir_prefix, self.experiment_args.model)
+    tokenizer = AutoTokenizer.from_pretrained(self.experiment_args.model)
     dataloader = load_unlearn_dataset(self.experiment_args, tokenizer, self.unlearning_args.batch_size, split=self.experiment_args.split)
 
     for lr in lrs:
@@ -155,7 +161,7 @@ class Experiment:
           temp_dict = defaultdict(list)
           for j in range(n):
             print(f'Running epxeriment {j+1} out of {n}')
-            results_dict = self.experiment_loop(base_model, tokenizer, dataloader)
+            results_dict = self.experiment_loop(dataloader)
             metric_names = [i for i in results_dict.keys() if i != "params"]
 
             for metric in metric_names:

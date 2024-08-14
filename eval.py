@@ -17,35 +17,19 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 
-def calculatePerplexity(sentence, model, tokenizer, accelerator):
+def calculatePerplexity(sentence, model, tokenizer):
     """
     exp(loss)
     """
-    input_ids = torch.tensor(sentence).unsqueeze(0)
-    print(f"Input id device: {input_ids.device}")
-# print(f"Input ids shape: {input_ids.size()}")
+    input_ids = sentence.clone().detach().unsqueeze(0)
     model.eval()
     with torch.no_grad():
-        print(f'Model device torch no_grad: {model.device}')
-        print(f'Input_ids device torch.no_grad {input_ids.device}')
         outputs = model(input_ids, labels=input_ids)
-        print(f'Model device after inference: {model.device}')
-    outputs = accelerator.gather_for_metrics(outputs)
-    print(outputs)
     loss, logits = outputs[:2]
-    print(f"Loss device: {loss.device}")
-    print(f'Model device: {model.device}')
-    print(f'Logits device: {logits.device}')
-    loss, logits = accelerator.prepare(loss, logits)
-    print(f'Loss and logits after accelerate: {loss.device}, {logits.device}')
-    # print(f"Loss shape: {loss.size()}")
-    # print(f"Loss: {loss}")
-    # print(f"Logits dimension: {np.array(logits).shape()}")
 
-    # print(f"Loss: {loss}")
-    # print(f"Logits: {logits}")
-    # print(f"Logits elem: {logits[0]}")
-    # print(f"Logits elem size: {logits[0][0].size()}")
+    device = next(model.parameters()).device
+    loss = loss.to(device)
+    logits = logits.to(device)
     '''
     extract logits:
     '''
@@ -53,19 +37,19 @@ def calculatePerplexity(sentence, model, tokenizer, accelerator):
     # probabilities = torch.nn.functional.log_softmax(logits[0][0], dim=-1)
 
     probabilities = torch.nn.functional.softmax(logits, dim=-1)
-    print(f'Probabilities device: {probabilities.device}')
+
     all_prob = []
     input_ids_processed = input_ids[0][1:]
-    print(f'input_ids_processed device: {input_ids_processed.device}')
+
     for i, token_id in enumerate(input_ids_processed):
         probability = probabilities[0, i, token_id].item()
         all_prob.append(probability)
 
-    # stuff for Min-K%++ calculation 
+    # stuff for Min-K%++ calculation
     probs = torch.nn.functional.softmax(logits[0, :-1], dim=-1)
-    print(f'Probs device: {probs.device}')
+
     log_probs = torch.nn.functional.log_softmax(logits[0, :-1], dim=-1)
-    print(f'log_probs device: {log_probs.device}')
+
     token_log_probs = log_probs.gather(dim=-1, index=input_ids_processed.unsqueeze(-1)).squeeze(-1)
     mu = (probs * log_probs).sum(-1)
     sigma = (probs * torch.square(log_probs)).sum(-1) - torch.square(mu)
@@ -76,7 +60,7 @@ def calculatePerplexity(sentence, model, tokenizer, accelerator):
 def calculate_min_K_plusplus_scores(model, tokenizer, text_batch):
     min_K_plusplus_values = []
     for text in text_batch:
-        min_k_plus = calculatePerplexity(text, model, tokenizer, gpu=model.device)[2]
+        min_k_plus = calculatePerplexity(text, model, tokenizer)[2]
         # Change ratio here
         k_length = int(len(min_k_plus)*0.3)
         topk_prob = np.sort(min_k_plus.cpu())[:k_length]
@@ -88,22 +72,19 @@ def calculate_min_K_plusplus_scores(model, tokenizer, text_batch):
 def calculate_min_K_scores(model, tokenizer, text_batch):
     min_K_values = []
     for text in text_batch:
-        all_prob = calculatePerplexity(text, model, tokenizer, gpu=model.device)[1]
+        all_prob = calculatePerplexity(text, model, tokenizer)[1]
         # Change ratio here
-        k_length = int(len(all_prob)*0.2)
+        k_length = int(len(all_prob)*0.3)
         topk_prob = np.sort(all_prob)[:k_length]
         min_K_score = -np.mean(topk_prob).item()
         min_K_values.append(min_K_score)
 
     return min_K_values
 
-def calculate_PPL_values(model, tokenizer, text_batch, accelerator):
+def calculate_PPL_values(model, tokenizer, text_batch):
     PPL_values = []
-    print(f'Model device (calculate_PPL_values): {model.device}')
-    print(f'Text batch device: {text_batch.device}')
     for text in text_batch:
-        print(f'Text device: {text.device}')
-        PPL = calculatePerplexity(text, model, tokenizer, accelerator)[0]
+        PPL = calculatePerplexity(text, model, tokenizer)[0]
         PPL_values.append(PPL)
     return PPL_values
 
@@ -133,12 +114,12 @@ def calculate_MIM_scores_combined(ref_PPLs, UL_PPLs, ref_Ks, UL_Ks, ref_Kplusplu
 
         MIM_Min_K_diff = (k_base - k_ul)
         MIM_Min_K_base = k_base
-        
+
         MIM_Min_Kplusplus_diff = (k_plusplus_base - k_plusplus_ul)
         MIM_Min_Kplusplus_base = k_plusplus_base
-        
+
         scores.append({"PPL difference": MIM_PPL_diff, "PPL base": MIM_PPL_base, "Min-K difference": MIM_Min_K_diff, "Min-K base": MIM_Min_K_base, "Min-K++ difference": MIM_Min_Kplusplus_diff, "Min-K++ base": MIM_Min_Kplusplus_base})
-    
+
     return scores
 
 # plot data 
