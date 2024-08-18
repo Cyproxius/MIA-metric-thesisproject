@@ -42,10 +42,12 @@ def get_experiment_args(args):
 
     
 def perform_experiment(parse_args, experiment_args):
-    lrs = parse_args.learning_rates
-    ul_steps = parse_args.unlearning_steps
-    batch_sizes = parse_args.batch_sizes
-    
+    lrs = [float(i) for i in parse_args.learning_rates[0].split(" ")]
+    ul_steps = [int(i) for i in parse_args.unlearning_steps[0].split(" ")]
+    batch_sizes = [int(i) for i in parse_args.batch_sizes[0].split(" ")]
+    print(lrs)
+    print(ul_steps)
+    print(batch_sizes)
     unlearning_args = UnlearningArgs(
             lr=lrs[0],
             steps = ul_steps[0],
@@ -74,12 +76,12 @@ if __name__ == "__main__":
     parser.add_argument('--threshold', '-t', type=int, default=160, help='Threshold value for cutting off tokenizer (default: 160)')
 
     # Unlearning arguments
-    parser.add_argument('--learning_rates', '-lrs', type=list, default=[1e-6], help='List of all learning rates to explore in grid search. Default [1e-6]')
-    parser.add_argument('--unlearning_steps', '-ul', type=list, default=[4], help='List of all unlearning steps to explore in grid search. Default [4]')
-    parser.add_argument('--batch_sizes', '-bs', type=list, default=[16], help='List of all batch sizes to explore in grid search. Default [16]')
+    parser.add_argument('--learning_rates', '-lrs', nargs="+", default=["1e-6"], help='List of all learning rates to explore in grid search. Default [1e-6]')
+    parser.add_argument('--unlearning_steps', '-ul', nargs="+", default=["4"], help='List of all unlearning steps to explore in grid search. Default [4]')
+    parser.add_argument('--batch_sizes', '-bs', nargs="+", default=["16"], help='List of all batch sizes to explore in grid search. Default [16]')
     parser.add_argument('--include_learning', '-ic', type=bool, default=False, help='Whether to use a trained model as a reference instead of the base model. Default: False')
     parser.add_argument('--metric', '-mt', type=str, default="All", help='Metric to use in calculating MIA. Choose from ["PPL", "Min_K", "Min_K++", "All"]. Default: "All"')
-    parser.add_argument('--num_repeats', '-n', type=str, default="1", help='Number of times to repeat each experiment. Defaults to 1.')
+    parser.add_argument('--num_repeats', '-n', type=int, default=1, help='Number of times to repeat each experiment. Defaults to 1.')
     
     # Parsing arguments
     args = parser.parse_args()
