@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument('--threshold', '-t', type=int, default=160, help='Threshold value for cutting off tokenizer (default: 160)')
 
     # Unlearning arguments
-    parser.add_argument('--learning_rates', '-lrs', nargs="+", default=["1e-6"], help='List of all learning rates to explore in grid search. Default [1e-6]')
+    parser.add_argument('--learning_rates', '-lrs', nargs="+", default=["3e-6"], help='List of all learning rates to explore in grid search. Default [1e-6]')
     parser.add_argument('--unlearning_steps', '-ul', nargs="+", default=["4"], help='List of all unlearning steps to explore in grid search. Default [4]')
     parser.add_argument('--batch_sizes', '-bs', nargs="+", default=["16"], help='List of all batch sizes to explore in grid search. Default [16]')
     parser.add_argument('--include_learning', '-ic', type=bool, default=False, help='Whether to use a trained model as a reference instead of the base model. Default: False')
