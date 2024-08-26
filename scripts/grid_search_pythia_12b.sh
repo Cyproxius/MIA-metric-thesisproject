@@ -1,4 +1,15 @@
-virtualenv --python python3 --system-site-packages $temp/env
-$temp/env/bin/pip install transformers torch tqdm numpy datasets accelerate matplotlib
-$temp/env/bin/python run.py --model "EleutherAI/pythia-12b" --dataset "swj0419/WikiMIA" --split_name "WikiMIA_length128" --learning_rates [0.0000001, 0.0000005, 0.000001, 0.000005, 0.00001] --batch_sizes [1,8,16] --unlearning_steps [4]
-rm -rf $temp/env
+#!/bin/bash
+#SBATCH -t 420
+#SBATCH -N 1
+#SBATCH -p gpu_h100
+#SBATCH --gpus-per-node=4
+
+#Loading modules
+module load 2023
+module load Python/3.11.3-GCCcore-12.3.0
+
+#Install pip modules
+pip install transformers torch tqdm numpy datasets accelerate matplotlib scikit-learn
+
+#Run script
+accelerate launch --config_file $HOME/.cache/huggingface/accelerate/default_config.yaml $HOME/MIA-metric-thesisproject/run.py --model "EleutherAI/pythia-12b" --dataset "swj0419/WikiMIA" --split_name "WikiMIA_length128" --learning_rates "1e-8 3e-8 5e-8 1e-7 3e-7 5e-7 1e-6 3e-6 5e-6"
