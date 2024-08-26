@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 240
+#SBATCH -t 360
 #SBATCH -N 2
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=4
