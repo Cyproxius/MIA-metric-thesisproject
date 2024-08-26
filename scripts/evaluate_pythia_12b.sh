@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 360
-#SBATCH -N 2
-#SBATCH -p gpu
+#SBATCH -N 1
+#SBATCH -p gpu_h100
 #SBATCH --gpus-per-node=4
 
 #Loading modules
