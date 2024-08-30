@@ -1,3 +1,0 @@
-The order to run the scripts is as follows (some scripts might need to be modified based on the experiment output):
-- grid_search_pythia_6_9b.sh and grid_search_pythia_12b.sh (use optimal parameters in running evaluation experiments)
-- evaluate_pythia_6_9b.sh and evaluate_pythia_12b.sh
